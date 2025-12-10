@@ -10,5 +10,11 @@
       "name": "v5.5.0",
       "rev": "fcbae5394ae8ad52d8e580a3477db99814b9d565"
     }
+  },
+  "lib/chainlink-ccip": {
+    "tag": {
+      "name": "contracts-ccip-v1.6.4",
+      "rev": "bccdd15b734ea6c0e6d1b3d36c482e64ced2d441"
+    }
   }
 }
