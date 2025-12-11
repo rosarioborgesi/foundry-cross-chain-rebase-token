@@ -2,17 +2,18 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+#rps_endpoints = { sepolia-eth = "", arb-sepolia = "" }
 remappings = [
     "@openzeppelin/contracts=lib/openzeppelin-contracts/contracts/",
-    "@chainlink/contracts/=lib/chainlink-evm/contracts/src/v0.8",
-    "@chainlink/contracts-ccip/contracts/=lib/chainlink-ccip/chains/evm/contracts/"
+    "@ccip/=lib/ccip/",
 ]
 
 [lint]
 exclude_lints = [
     "screaming-snake-case-immutable", 
     "mixed-case-variable", 
-    "screaming-snake-case-const"
+    "screaming-snake-case-const",
+    "erc20-unchecked-transfer"
 ]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
