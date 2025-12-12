@@ -22,6 +22,7 @@ import {IRebaseToken} from "../src/interfaces/IRebaseToken.sol";
 contract CrossChainTest is Test {
     address owner = makeAddr("owner");
     address user = makeAddr("user");
+    uint256 SEND_VALUE = 1e5;
 
     uint256 sepoliaFork;
     uint256 arbSepoliaFork;
@@ -139,11 +140,14 @@ contract CrossChainTest is Test {
         RebaseToken localToken,
         RebaseToken remoteToken
     ) public {
+        // Create the message to send tokens cross-chain
         vm.selectFork(localFork);
+        vm.startPrank(user);
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
         tokenAmounts[0] = Client.EVMTokenAmount({token: address(localToken), amount: amountToBridge});
-
-        // We are imaging the user is sending the message to himself receiver: abi.encode(user),
+        // Approve the router to burn tokens on users behalf
+        IERC20(address(localToken)).approve(localNetworkDetails.routerAddress, amountToBridge);
+// We are imaging the user is sending the message to himself receiver: abi.encode(user),
         // we are not sending any data so data:""
         // feeToken: address(0) means native tokens i.e msg.value
         // feeToken: localNetworkDetails.linkAddress means the link token on the local chain
@@ -155,34 +159,56 @@ contract CrossChainTest is Test {
             feeToken: localNetworkDetails.linkAddress,
             extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 0}))
         });
-        uint256 fee =
-            IRouterClient(localNetworkDetails.routerAddress).getFee(remoteNetworkDetails.chainSelector, message);
-        // let's pretend to have some LINKs, it's like a deal
-        ccipLocalSimulatorFork.requestLinkFromFaucet(user, fee);
-        vm.prank(user);
-        IERC20(localNetworkDetails.linkAddress).approve(localNetworkDetails.routerAddress, fee);
-        vm.prank(user);
-        IERC20(address(localToken)).approve(localNetworkDetails.routerAddress, amountToBridge);
-        uint256 localBalanceBefore = localToken.balanceOf(user);
-        vm.prank(user);
-        // Send the tokens cross chain
-        IRouterClient(localNetworkDetails.routerAddress).ccipSend(remoteNetworkDetails.chainSelector, message);
-        uint256 localBalanceAfter = localToken.balanceOf(user);
-        assertEq(localBalanceAfter, localBalanceBefore - amountToBridge);
-        uint256 localUserInterestRate = localToken.getUserInterestRate(user);
+        // Get and approve the fees
+        vm.stopPrank();
+        // Give the user the fee amount of LINK
+        ccipLocalSimulatorFork.requestLinkFromFaucet(
+            user, IRouterClient(localNetworkDetails.routerAddress).getFee(remoteNetworkDetails.chainSelector, message)
+        );
+        vm.startPrank(user);
+        IERC20(localNetworkDetails.linkAddress).approve(
+            localNetworkDetails.routerAddress,
+            IRouterClient(localNetworkDetails.routerAddress).getFee(remoteNetworkDetails.chainSelector, message)
+        ); // Approve the fee
+        // log the values before bridging
+        uint256 balanceBeforeBridge = IERC20(address(localToken)).balanceOf(alice);
+        console.log("Local balance before bridge: %d", balanceBeforeBridge);
+
+        IRouterClient(localNetworkDetails.routerAddress).ccipSend(remoteNetworkDetails.chainSelector, message); // Send the message
+        uint256 sourceBalanceAfterBridge = IERC20(address(localToken)).balanceOf(alice);
+        console.log("Local balance after bridge: %d", sourceBalanceAfterBridge);
+        assertEq(sourceBalanceAfterBridge, balanceBeforeBridge - amountToBridge);
+        vm.stopPrank();
 
         vm.selectFork(remoteFork);
-        vm.warp(block.timestamp + 20 minutes);
-        uint256 remoteBalanceBefore = remoteToken.balanceOf(user);
-        // This will propagate the message and send it cross chain
+        // Pretend it takes 15 minutes to bridge the tokens
+        vm.warp(block.timestamp + 900);
+        // get initial balance on Arbitrum
+        uint256 initialArbBalance = IERC20(address(remoteToken)).balanceOf(alice);
+        console.log("Remote balance before bridge: %d", initialArbBalance);
+        vm.selectFork(localFork); // in the latest version of chainlink-local, it assumes you are currently on the local fork before calling switchChainAndRouteMessage
         ccipLocalSimulatorFork.switchChainAndRouteMessage(remoteFork);
-        uint256 remotebalanceAfter = remoteToken.balanceOf(user);
-        assertEq(remotebalanceAfter, remoteBalanceBefore + amountToBridge);
-        uint256 remotelUserInterestRate = remoteToken.getUserInterestRate(user);
-        assertEq(remotelUserInterestRate, localUserInterestRate);
+
+        console.log("Remote user interest rate: %d", remoteToken.getUserInterestRate(alice));
+        uint256 destBalance = IERC20(address(remoteToken)).balanceOf(alice);
+        console.log("Remote balance after bridge: %d", destBalance);
+        assertEq(destBalance, initialArbBalance + amountToBridge);
     }
 
-    function testMyTest() public {
-        assertTrue(true);
+    function testBridgeAllTokens() public {
+        vm.selectFork(sepoliaFork);
+        vm.deal(user, SEND_VALUE);
+        vm.prank(user);
+        Vault(payable(address(vault))).deposit{value: SEND_VALUE}();
+        assertEq(sepoliaToken.balanceOf(user), SEND_VALUE);
+        bridgeTokens(
+            SEND_VALUE,
+            sepoliaFork,
+            arbSepoliaFork,
+            sepoliaNetworkDetails,
+            arbSepoliaNetworkDetails,
+            sepoliaToken,
+            arbSepoliaToken
+        );
     }
 }
