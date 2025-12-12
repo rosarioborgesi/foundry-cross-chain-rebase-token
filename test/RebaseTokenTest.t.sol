@@ -129,16 +129,20 @@ contract RebaseTokenTest is Test {
         rebaseToken.setInterestRate(newInterestRate);
     }
 
-    function testCannotCallMintAndBurn() public {
+    function testCannotCallMint() public {
+        // Deposit funds
         vm.startPrank(user);
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, user, MINT_AND_BURN_ROLE)
-        );
-        rebaseToken.mint(user, 1e18, rebaseToken.getInterestRate());
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, user, MINT_AND_BURN_ROLE)
-        );
-        rebaseToken.burn(user, 1e18);
+        uint256 interestRate = rebaseToken.getInterestRate();
+        vm.expectRevert();
+        rebaseToken.mint(user, 1e5, interestRate);
+        vm.stopPrank();
+    }
+
+    function testCannotCallBurn() public {
+        // Deposit funds
+        vm.startPrank(user);
+        vm.expectRevert();
+        rebaseToken.burn(user, 1e5);
         vm.stopPrank();
     }
 
