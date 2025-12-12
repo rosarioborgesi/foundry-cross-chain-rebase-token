@@ -140,24 +140,22 @@ contract CrossChainTest is Test {
         RebaseToken localToken,
         RebaseToken remoteToken
     ) public {
-        // Create the message to send tokens cross-chain
+         // Create the message to send tokens cross-chain
         vm.selectFork(localFork);
         vm.startPrank(user);
-        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
-        tokenAmounts[0] = Client.EVMTokenAmount({token: address(localToken), amount: amountToBridge});
+        Client.EVMTokenAmount[] memory tokenToSendDetails = new Client.EVMTokenAmount[](1);
+        Client.EVMTokenAmount memory tokenAmount =
+            Client.EVMTokenAmount({token: address(localToken), amount: amountToBridge});
+        tokenToSendDetails[0] = tokenAmount;
         // Approve the router to burn tokens on users behalf
         IERC20(address(localToken)).approve(localNetworkDetails.routerAddress, amountToBridge);
-// We are imaging the user is sending the message to himself receiver: abi.encode(user),
-        // we are not sending any data so data:""
-        // feeToken: address(0) means native tokens i.e msg.value
-        // feeToken: localNetworkDetails.linkAddress means the link token on the local chain
-        // extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({ gasLimit: 0 })) means no gas limit
+
         Client.EVM2AnyMessage memory message = Client.EVM2AnyMessage({
-            receiver: abi.encode(user),
-            data: "",
-            tokenAmounts: tokenAmounts,
-            feeToken: localNetworkDetails.linkAddress,
-            extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: 0}))
+            receiver: abi.encode(user), // we need to encode the address to bytes
+            data: "", // We don't need any data for this example
+            tokenAmounts: tokenToSendDetails, // this needs to be of type EVMTokenAmount[] as you could send multiple tokens
+            extraArgs: "", // We don't need any extra args for this example
+            feeToken: localNetworkDetails.linkAddress // The token used to pay for the fee
         });
         // Get and approve the fees
         vm.stopPrank();
@@ -171,11 +169,11 @@ contract CrossChainTest is Test {
             IRouterClient(localNetworkDetails.routerAddress).getFee(remoteNetworkDetails.chainSelector, message)
         ); // Approve the fee
         // log the values before bridging
-        uint256 balanceBeforeBridge = IERC20(address(localToken)).balanceOf(alice);
+        uint256 balanceBeforeBridge = IERC20(address(localToken)).balanceOf(user);
         console.log("Local balance before bridge: %d", balanceBeforeBridge);
 
         IRouterClient(localNetworkDetails.routerAddress).ccipSend(remoteNetworkDetails.chainSelector, message); // Send the message
-        uint256 sourceBalanceAfterBridge = IERC20(address(localToken)).balanceOf(alice);
+        uint256 sourceBalanceAfterBridge = IERC20(address(localToken)).balanceOf(user);
         console.log("Local balance after bridge: %d", sourceBalanceAfterBridge);
         assertEq(sourceBalanceAfterBridge, balanceBeforeBridge - amountToBridge);
         vm.stopPrank();
@@ -184,13 +182,13 @@ contract CrossChainTest is Test {
         // Pretend it takes 15 minutes to bridge the tokens
         vm.warp(block.timestamp + 900);
         // get initial balance on Arbitrum
-        uint256 initialArbBalance = IERC20(address(remoteToken)).balanceOf(alice);
+        uint256 initialArbBalance = IERC20(address(remoteToken)).balanceOf(user);
         console.log("Remote balance before bridge: %d", initialArbBalance);
         vm.selectFork(localFork); // in the latest version of chainlink-local, it assumes you are currently on the local fork before calling switchChainAndRouteMessage
         ccipLocalSimulatorFork.switchChainAndRouteMessage(remoteFork);
 
-        console.log("Remote user interest rate: %d", remoteToken.getUserInterestRate(alice));
-        uint256 destBalance = IERC20(address(remoteToken)).balanceOf(alice);
+        console.log("Remote user interest rate: %d", remoteToken.getUserInterestRate(user));
+        uint256 destBalance = IERC20(address(remoteToken)).balanceOf(user);
         console.log("Remote balance after bridge: %d", destBalance);
         assertEq(destBalance, initialArbBalance + amountToBridge);
     }
