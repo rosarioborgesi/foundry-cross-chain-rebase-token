@@ -23,7 +23,7 @@ install :; forge install foundry-rs/forge-std && forge install openzeppelin/open
 # Update Dependencies
 update:; forge update
 
-build:; forge build --via-ir
+build:; forge build
 
 test :; forge test 
 

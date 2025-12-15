@@ -140,7 +140,7 @@ contract CrossChainTest is Test {
         RebaseToken localToken,
         RebaseToken remoteToken
     ) public {
-         // Create the message to send tokens cross-chain
+        // Create the message to send tokens cross-chain
         vm.selectFork(localFork);
         vm.startPrank(user);
         Client.EVMTokenAmount[] memory tokenToSendDetails = new Client.EVMTokenAmount[](1);
