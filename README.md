@@ -143,8 +143,11 @@ BASE_SEPOLIA_RPC_URL=...
 
 You can also run the provided convenience script:
 
+```bash
 chmod +x bridgeFromSepoliaToBaseSepolia.sh
-./bridgeFromSepoliaToBaseSepolia.shThis will:
+./bridgeFromSepoliaToBaseSepolia.sh 
+```
+This will:
 - Deploy contracts on **Base Sepolia** and **Sepolia**.
 - Deploy the **vault** on Sepolia.
 - Configure both **token pools**.
